@@ -27,8 +27,6 @@ The project integrates data from CRM (Customer Relationship Management) and ERP 
 
 Using a layered architecture, raw data will be loaded, cleaned, standardized, and modeled to support business intelligence and analytical reporting.
 
-The project follows the concepts demonstrated in the tutorial [SQL Data Warehouse from Scratch | Full Hands-On Data Engineering Project](https://www.youtube.com/watch?v=9GVqKuTVANE), with PostgreSQL used as the database engine.
-
 ## 📋 Business Requirements
 
 The data warehouse aims to address the following business needs:

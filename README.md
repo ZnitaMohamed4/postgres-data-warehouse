@@ -1,16 +1,16 @@
 # 🏗️ Data Forge — PostgreSQL Data Warehouse
-
-Building a modern data warehouse from scratch using PostgreSQL, SQL, and the Medallion Architecture to transform raw CRM and ERP data into clean, analytics-ready datasets.
-
-> **Project status:** 🚧 In development
-
+ 
+A data warehouse built from scratch with PostgreSQL, SQL, and the Medallion Architecture. It transforms raw CRM and ERP data into clean, analytics-ready datasets.
+ 
+> **Project status:** ✅ Bronze, Silver and Gold layers implemented. 🚧 BI reporting and documentation diagrams in progress.
+ 
 ## 📌 Table of Contents
-
+ 
 - [Overview](#-overview)
 - [Business Requirements](#-business-requirements)
 - [Objectives](#-objectives)
-- [Technical Specifications](#-technical-specifications)
 - [Architecture](#-architecture)
+- [Data Model](#-data-model)
 - [Technology Stack](#-technology-stack)
 - [BI & Reporting](#-bi--reporting)
 - [Project Structure](#-project-structure)
@@ -18,211 +18,184 @@ Building a modern data warehouse from scratch using PostgreSQL, SQL, and the Med
 - [Project Roadmap](#-project-roadmap)
 - [License](#-license)
 - [About Me](#-about-me)
-
 ## 🎯 Overview
-
-Data Forge is a hands-on Data Engineering project focused on designing and building a SQL-based data warehouse from scratch.
-
-The project integrates data from CRM (Customer Relationship Management) and ERP (Enterprise Resource Planning) source systems into a centralized analytical environment.
-
-Using a layered architecture, raw data will be loaded, cleaned, standardized, and modeled to support business intelligence and analytical reporting.
-
+ 
+Data Forge is a hands-on Data Engineering project that designs and builds a SQL-based data warehouse.
+ 
+It integrates data from two source systems, CRM (Customer Relationship Management) and ERP (Enterprise Resource Planning), into one analytical environment. Six CSV files are loaded, cleaned, standardized, and modeled into a star schema for business intelligence and reporting.
+ 
 ## 📋 Business Requirements
-
-The data warehouse aims to address the following business needs:
-
-- **Data integration:** Consolidate customer, product, and sales data from multiple CRM and ERP sources.
-- **Data quality:** Identify and handle missing values, duplicates, inconsistent formats, and invalid records.
-- **Centralized analytics:** Provide a consistent source of data for business reporting.
-- **Historical tracking:** Structure customer and product data to support historical analysis where required.
-- **Analytical performance:** Organize data for efficient business queries and aggregations.
-- **Documentation:** Maintain clear technical documentation of the architecture, transformations, and data flows.
-
+ 
+- **Data integration:** Consolidate customer, product, and sales data from CRM and ERP sources.
+- **Data quality:** Handle missing values, duplicates, inconsistent formats, and invalid records.
+- **Centralized analytics:** Provide one consistent source of data for reporting.
+- **Historical tracking:** Product history is rebuilt in Silver, and Gold exposes current products.
+- **Documentation:** Document the data model and every Gold object in a data catalog.
 ## 🎯 Objectives
-
-The primary objectives are to:
-
-1. Design a data warehouse architecture using the Medallion approach.
-2. Develop SQL-based ETL pipelines for data extraction, transformation, and loading.
-3. Implement Bronze, Silver, and Gold data layers.
-4. Apply data cleansing, standardization, and validation techniques.
-5. Build a dimensional data model using facts, dimensions, and a star schema.
-6. Create reusable SQL scripts, views, and stored procedures where appropriate.
-7. Develop analytical queries and prepare datasets for BI reporting.
-8. Use Git and GitHub for version control and project documentation.
-
-## ⚙️ Technical Specifications
-
-### Functional requirements
-
-- Load raw CRM and ERP datasets into the warehouse.
-- Preserve source data in the Bronze layer.
-- Clean and standardize data in the Silver layer.
-- Expose business-ready analytical datasets in the Gold layer.
-- Integrate customer, product, and sales information.
-- Support aggregations, joins, filtering, and business KPI calculations.
-- Document the warehouse schema and data lineage.
-
-### Non-functional requirements
-
-- **Data integrity:** Maintain consistency and enforce appropriate constraints.
-- **Maintainability:** Organize SQL scripts into clear, modular components.
-- **Reproducibility:** Provide documented setup and execution instructions.
-- **Traceability:** Record relevant load metadata and data sources where appropriate.
-- **Performance:** Use appropriate data types, indexes, and query optimization techniques when needed.
-
+ 
+1. Design a data warehouse using the Medallion architecture.
+2. Build SQL-based ETL pipelines with PL/pgSQL stored procedures.
+3. Implement Bronze, Silver, and Gold layers.
+4. Apply data cleansing, standardization, and validation.
+5. Build a dimensional model (star schema) with facts and dimensions.
+6. Validate each layer with quality-check scripts.
+7. Use Git and GitHub for version control and documentation.
 ## 🏛️ Architecture
-
-The project follows the **Medallion Architecture**, with three logical layers.
-
-### 🥉 Bronze — Raw Data
-
-The ingestion layer.
-
-- Store source data with minimal transformations.
-- Preserve source structure and traceability.
-- Create tables and SQL scripts for loading source files.
-- Record relevant ingestion metadata.
-
-### 🥈 Silver — Cleaned Data
-
-The data quality and standardization layer.
-
-- Handle missing and invalid values.
-- Remove unwanted spaces and standardize formats.
-- Identify and manage duplicate records.
-- Apply data type conversions and business validation rules.
-- Integrate related source data when appropriate.
-
-### 🥇 Gold — Business-Ready Data
-
-The analytical consumption layer.
-
-- Create customer and product dimensions.
-- Create a sales fact model.
-- Implement a star schema.
-- Expose business-ready datasets through SQL views where appropriate.
-- Support analytical queries and BI reporting.
-
-Views will be used where virtual, reusable transformations are suitable. Materialized results or tables may be considered when performance or workload requirements justify them.
-
+ 
+The project follows the **Medallion Architecture**.
+ 
+### 🥉 Bronze: Raw Data
+ 
+- Raw CSV files loaded as is, with no transformation (full load: `TRUNCATE` + `COPY`).
+- 6 tables: 3 from CRM, 3 from ERP.
+- Loaded by `CALL bronze.load_bronze();`
+### 🥈 Silver: Cleaned Data
+ 
+- Duplicates and NULL keys removed (`ROW_NUMBER()`).
+- Text trimmed and coded values standardized (`M` becomes `Male`, `DE` becomes `Germany`, and so on).
+- Invalid dates and amounts corrected or set to NULL; `prd_key` split into category ID and product key.
+- Product end dates rebuilt with `LEAD()`.
+- Loaded by `CALL silver.load_silver();`
+### 🥇 Gold: Business-Ready Data
+ 
+- Three SQL views forming a star schema: `gold.dim_customers`, `gold.dim_products`, `gold.fact_sales`.
+- Customer data from CRM and ERP is integrated with LEFT JOINs (the CRM is the master source).
+- See [`docs/data_catalog.md`](docs/data_catalog.md) for every column.
+## 🧩 Data Model
+ 
+```
+gold.dim_customers (customer_key) 1 ----< N gold.fact_sales
+gold.dim_products  (product_key)  1 ----< N gold.fact_sales
+```
+ 
+| Object | Type | Description |
+|---|---|---|
+| `gold.dim_customers` | Dimension | One row per customer (profile, gender, birth date, country) |
+| `gold.dim_products` | Dimension | One row per current product, with category and subcategory |
+| `gold.fact_sales` | Fact | One row per sales order line |
+ 
 ## 🛠️ Technology Stack
-
+ 
 | Technology | Purpose |
 |---|---|
 | PostgreSQL | Relational database and SQL processing |
-| SQL | Data loading, cleansing, transformation, and analytics |
-| PL/pgSQL | Stored procedures and procedural database logic, where needed |
-| Git & GitHub | Version control and project collaboration |
-| VS Code | SQL development and project organization |
-| DBeaver Community | Database connection and visual query execution |
+| SQL | Loading, cleansing, transformation, and analytics |
+| PL/pgSQL | Stored procedures for the Bronze and Silver loads |
+| Git & GitHub | Version control |
+| VS Code | SQL development |
+| DBeaver Community | Database client and query execution |
 | Draw.io | Architecture and data-flow diagrams |
-| Power BI / alternative BI tool | Potential dashboarding and reporting layer |
-
+ 
 ## 📊 BI & Reporting
-
-The Gold layer is intended to support business intelligence and analytical reporting.
-
-Potential analytical questions include:
-
+ 
+The Gold layer is ready to support reporting. Questions it can answer:
+ 
 - What is the total revenue over a given period?
-- Which products generate the most revenue?
+- Which products and categories generate the most revenue?
 - Who are the highest-value customers?
-- How do sales evolve over time?
-- Which product categories perform best?
-- What patterns can be identified across customer locations?
-
-Potential KPIs:
-
-- Total sales revenue
-- Number of orders or sales transactions
-- Average order value, if the source data supports it
-- Revenue by product and category
-- Revenue by customer
-- Sales trends over time
-
-A BI dashboard may be added once the analytical data model is implemented and validated.
-
+- How do sales evolve over time, and how do they differ by country?
+A BI dashboard (Power BI or an alternative) is the next step.
+ 
 ## 📁 Project Structure
-
-The repository is organized around the main development stages.
-
+ 
 ```text
 postgres-data-warehouse/
 ├── datasets/
 │   ├── source_crm/
 │   └── source_erp/
 ├── docs/
-│   ├── architecture/
-│   ├── data_catalog.md
-│   └── data_flow.md
+│   └── data_catalog.md
 ├── scripts/
+│   ├── init_database.sql
+│   ├── create_schemas.sql
 │   ├── bronze/
+│   │   ├── ddl_bronze.sql
+│   │   └── proc_load_bronze.sql
 │   ├── silver/
+│   │   ├── ddl_silver.sql
+│   │   └── proc_load_silver.sql
 │   └── gold/
+│       └── ddl_gold.sql
 ├── tests/
+│   ├── quality_checks_silver.sql
+│   └── quality_checks_gold.sql
 ├── README.md
 └── LICENSE
 ```
-
-*The structure may evolve as implementation progresses. Empty folders and planned files may not yet contain implemented functionality.*
-
+ 
 ## 🚀 Getting Started
-
+ 
 ### Prerequisites
-
-- PostgreSQL installed and running
+ 
+- PostgreSQL 13+ installed and running
 - Git
 - VS Code or another SQL editor
 - DBeaver Community Edition or an equivalent database client
-
 ### Setup
-
+ 
 1. Clone the repository:
-
-   ```bash
+```bash
    git clone https://github.com/ZnitaMohamed4/postgres-data-warehouse.git
    cd postgres-data-warehouse
-   ```
-
-2. Create a PostgreSQL database for the project.
-
-3. Configure your database connection using your local PostgreSQL credentials.
-
-4. Follow the SQL scripts and setup instructions as they become available in the repository.
-
-> Detailed installation, database initialization, and pipeline execution instructions will be added as the project develops.
-
+```
+ 
+2. Make the CSV files readable by the PostgreSQL server. `COPY` runs as the `postgres` user, which usually cannot read your home folder, so copy the datasets to `/tmp`:
+```bash
+   cp -r datasets /tmp/datasets
+   chmod -R a+rX /tmp/datasets
+```
+ 
+   The file paths used by `bronze.load_bronze()` point to `/tmp/datasets/...`. Adjust them in `scripts/bronze/proc_load_bronze.sql` if you use another location.
+ 
+3. Run the scripts in this order (connected to the right database):
+   | Order | Script | Connect to |
+   |---|---|---|
+   | 1 | `scripts/init_database.sql` (drops and recreates the DB) | `postgres` |
+   | 2 | `scripts/create_schemas.sql` | `datawarehouse` |
+   | 3 | `scripts/bronze/ddl_bronze.sql` | `datawarehouse` |
+   | 4 | `scripts/bronze/proc_load_bronze.sql` | `datawarehouse` |
+   | 5 | `scripts/silver/ddl_silver.sql` | `datawarehouse` |
+   | 6 | `scripts/silver/proc_load_silver.sql` | `datawarehouse` |
+   | 7 | `scripts/gold/ddl_gold.sql` | `datawarehouse` |
+4. Load the data:
+```sql
+   CALL bronze.load_bronze();
+   CALL silver.load_silver();
+```
+ 
+   The Gold views update automatically, since they read from Silver.
+ 
+5. Validate with the scripts in `tests/`. Every check should return no rows.
+> Note: `init_database.sql` deletes the `datawarehouse` database. Do not run it on data you want to keep.
+ 
 ## 🗺️ Project Roadmap
-
-- [ ] Initialize the repository and establish naming conventions.
-- [ ] Analyze the source CRM and ERP datasets.
-- [ ] Design the data architecture and document data flows.
-- [ ] Create the database and Bronze, Silver, and Gold schemas.
-- [ ] Implement Bronze tables and raw-data loading scripts.
-- [ ] Develop Silver transformations and data quality checks.
-- [ ] Create reusable loading procedures where appropriate.
-- [ ] Design customer and product dimensions.
-- [ ] Build the sales fact model and star schema.
-- [ ] Develop Gold views and analytical SQL queries.
-- [ ] Document the data catalog and lineage.
+ 
+- [x] Initialize the repository and establish naming conventions.
+- [x] Analyze the source CRM and ERP datasets.
+- [ ] Document the architecture and data flow diagrams.
+- [x] Create the database and the Bronze, Silver, and Gold schemas.
+- [x] Implement Bronze tables and the load procedure.
+- [x] Develop Silver transformations, the load procedure, and quality checks.
+- [x] Design the customer and product dimensions.
+- [x] Build the sales fact model and star schema.
+- [x] Develop Gold views and quality checks.
+- [x] Document the data catalog.
 - [ ] Add BI reporting and validate business KPIs.
-- [ ] Improve the project with automated testing and further data engineering tools.
-
+- [ ] Add automated testing and further data engineering tools.
 ## 📄 License
-
+ 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
+ 
 ## 👨‍💻 About Me
-
+ 
 I'm **Mohamed Znita**, a Master's graduate in Artificial Intelligence and Data Science, interested in building reliable data systems and developing practical Data Engineering skills.
-
-This project is part of my journey toward mastering SQL, data warehousing, ETL pipelines, dimensional modeling, and business intelligence.
-
+ 
+This project is part of my journey toward mastering SQL, data warehousing, ETL pipelines, dimensional modeling, and business intelligence. It follows the structure of a public data engineering tutorial, adapted from SQL Server to PostgreSQL.
+ 
 **Connect with me:**
-
+ 
 - GitHub: [@ZnitaMohamed4](https://github.com/ZnitaMohamed4)
-
 ---
-
+ 
 *Built with PostgreSQL, SQL, and a commitment to learning by building.*
+ 
